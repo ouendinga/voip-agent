@@ -262,18 +262,6 @@ Los servicios utilizan las siguientes variables de entorno configuradas en `dock
 - `RABBITMQ_USER`: Usuario de RabbitMQ
 - `RABBITMQ_PASS`: Contraseña de RabbitMQ
 
-## TODO's
-
-- [ ] Cambiar el módulo obsoleto `chan_sip` por una alternativa moderna (`chan_pjsip`)
-- [ ] Implementar lógica de negocio en los microservicios Python
-- [ ] Agregar pruebas automatizadas
-- [ ] Implementar autenticación de usuarios
-- [ ] Configurar SSL/TLS para comunicaciones seguras
-- [ ] Añadir monitoreo y métricas con Prometheus/Grafana
-- [ ] Implementar CI/CD pipeline
-- [ ] Optimizar el rendimiento del sistema
-- [ ] Documentar API endpoints
-- [ ] Agregar ejemplos de uso y casos de prueba
 
 ## Contribución
 
