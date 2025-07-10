@@ -1,0 +1,79 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Docker volumes and data
+docker/data/
+volumes/
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.backup
+*.bak
+
+# Secrets and keys
+*.key
+*.pem
+*.crt
+secrets/
+
+# Asterisk specific
+asterisk/logs/
+asterisk/spool/
+asterisk/db/
+asterisk/monitor/
+
+# Docker override files
+docker-compose.override.yml
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+
+# Node modules (if using any JS tools)
+node_modules/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/

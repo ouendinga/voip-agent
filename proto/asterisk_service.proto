@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package asterisk_service;
+
+// Servicio para interactuar con Asterisk
+service AsteriskConnector {
+  // Bidi-streaming para enviar audio a Asterisk y recibir eventos/audio
+  rpc HandleCallStream (stream CallStreamRequest) returns (stream CallStreamResponse);
+  // Unary call para comandos simples como colgar una llamada
+  rpc HangupCall (HangupCallRequest) returns (HangupCallResponse);
+}
+
+// Mensajes para el stream de la llamada
+message CallStreamRequest {
+  string call_id = 1; // ID único de la llamada
+  oneof payload {
+    bytes audio_chunk = 2; // Chunk de audio del usuario a transcribir
+    string event_type = 3; // Tipo de evento de control (ej., "CALL_START", "CALL_END")
+    // Podríamos añadir más tipos de control si es necesario
+  }
+}
+
+message CallStreamResponse {
+  string call_id = 1; // ID único de la llamada
+  oneof payload {
+    bytes audio_chunk = 2; // Chunk de audio del asistente para reproducir en Asterisk
+    string text_response = 3; // Texto transcribido del usuario (STT)
+    string event_type = 4; // Eventos de Asterisk o control (ej., "DTMF_DETECTED", "CALL_ENDED")
+  }
+}
+
+// Mensajes para colgar la llamada
+message HangupCallRequest {
+  string call_id = 1;
+}
+
+message HangupCallResponse {
+  bool success = 1;
+  string message = 2;
+}

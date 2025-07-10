@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package stt_tts_service;
+
+// Servicio para Speech-to-Text y Text-to-Speech
+service SttTtsService {
+  // Stream de audio para transcripción (STT)
+  rpc RecognizeSpeech (stream SpeechRecognitionRequest) returns (stream SpeechRecognitionResponse);
+  // Stream de texto para generar audio (TTS)
+  rpc SynthesizeSpeech (stream SynthesisRequest) returns (stream SynthesisResponse);
+}
+
+// Mensajes para el reconocimiento de voz (STT)
+message SpeechRecognitionRequest {
+  string call_id = 1; // Para correlacionar con la llamada de Asterisk
+  bytes audio_chunk = 2; // Chunk de audio para transcribir
+  string language_code = 3; // Ej: "es-ES", "en-US"
+  bool final_recognition = 4; // Indica si este chunk es el final de una frase
+}
+
+message SpeechRecognitionResponse {
+  string call_id = 1;
+  string transcript = 2; // Texto transcrito
+  bool is_final = 3; // Indica si la transcripción es final o parcial
+}
+
+// Mensajes para la síntesis de voz (TTS)
+message SynthesisRequest {
+  string call_id = 1;
+  string text_input = 2; // Texto a sintetizar
+  string language_code = 3;
+  string voice_name = 4; // Opcional: Nombre de la voz a usar
+}
+
+message SynthesisResponse {
+  string call_id = 1;
+  bytes audio_chunk = 2; // Chunk de audio generado
+  bool is_final = 3; // Indica si es el último chunk del audio
+}

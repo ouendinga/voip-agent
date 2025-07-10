@@ -1,0 +1,119 @@
+services:
+  # ------------------------------------
+  # Infraestructura de Base
+  # ------------------------------------
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672" # Puerto AMQP para clientes
+      - "15672:15672" # Puerto de la interfaz de gestión web
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+    networks:
+      - my_assistant_network
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db # Persistencia de datos
+    networks:
+      - my_assistant_network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data # Persistencia de datos
+    networks:
+      - my_assistant_network
+
+  # ------------------------------------
+  # Asterisk (Servicio telefónico)
+  # ------------------------------------
+  asterisk:
+    build:
+      context: ./docker/asterisk # Ruta al Dockerfile de Asterisk
+      dockerfile: Dockerfile
+    container_name: asterisk
+    ports:
+      - "5060:5060/udp" # SIP UDP
+      - "5061:5061/tcp" # SIP TCP/TLS (opcional)
+      - "8088:8088" # HTTP for ARI/AMI (si lo configuramos)
+      - "5038:5038" # AMI Manager Interface
+    volumes:
+      - ./docker/asterisk/conf:/etc/asterisk # Configuración de Asterisk
+      - ./docker/asterisk/sounds:/var/lib/asterisk/sounds # Archivos de audio
+    environment:
+      # Puedes añadir variables de entorno para configurar Asterisk si es necesario
+      ASTERISK_AMI_USER: amiuser
+      ASTERISK_AMI_PASS: amipassword
+    networks:
+      - my_assistant_network
+
+  # ------------------------------------
+  # Microservicios Python
+  # ------------------------------------
+  asterisk_connector:
+    build:
+      context: . # El contexto es la raíz del proyecto
+      dockerfile: ./src/asterisk_connector/Dockerfile # Dockerfile específico del módulo
+    container_name: asterisk_connector
+    environment:
+      # Variables de entorno para conectar con Asterisk y RabbitMQ
+      ASTERISK_HOST: asterisk
+      ASTERISK_AMI_PORT: 5038
+      ASTERISK_AMI_USER: amiuser
+      ASTERISK_AMI_PASS: amipassword
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: user
+      RABBITMQ_PASS: password
+    volumes:
+      - ./src/asterisk_connector:/app # Monta el código del módulo
+      - ./proto:/proto # Monta los archivos proto para la generación de código gRPC
+    depends_on:
+      - asterisk
+      - rabbitmq
+    networks:
+      - my_assistant_network
+
+  stt_tts_service:
+    build:
+      context: .
+      dockerfile: ./src/stt_tts_interface/Dockerfile
+    container_name: stt_tts_service
+    environment:
+      # Variables de entorno para las keys de los servicios STT/TTS
+      # y para RabbitMQ si también lo usa para comunicarse
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: user
+      RABBITMQ_PASS: password
+      # Ejemplo: GOOGLE_APPLICATION_CREDENTIALS: /app/google_creds.json
+    volumes:
+      - ./src/stt_tts_interface:/app
+      - ./proto:/proto
+      # - ./path/to/your/google_creds.json:/app/google_creds.json:ro # Si usas credenciales de GCP
+    depends_on:
+      - rabbitmq
+    networks:
+      - my_assistant_network
+
+  # Otros servicios como conversation_engine, persistence_manager, etc.,
+  # se añadirían aquí siguiendo un patrón similar.
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  my_assistant_network:
+    driver: bridge
