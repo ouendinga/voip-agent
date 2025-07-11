@@ -9,8 +9,9 @@ services:
       - "5672:5672" # Puerto AMQP para clientes
       - "15672:15672" # Puerto de la interfaz de gestión web
     environment:
-      RABBITMQ_DEFAULT_USER: user
-      RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_DEFAULT_USER: voipuser
+      RABBITMQ_DEFAULT_PASS: voip1234
+    restart: unless-stopped
     networks:
       - my_assistant_network
 
@@ -75,8 +76,8 @@ services:
       ASTERISK_AMI_USER: amiuser
       ASTERISK_AMI_PASS: amipassword
       RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: user
-      RABBITMQ_PASS: password
+      RABBITMQ_USER: voipuser
+      RABBITMQ_PASS: voip1234
     volumes:
       - ./src/asterisk_connector:/app # Monta el código del módulo
       - ./proto:/proto # Monta los archivos proto para la generación de código gRPC
@@ -95,8 +96,8 @@ services:
       # Variables de entorno para las keys de los servicios STT/TTS
       # y para RabbitMQ si también lo usa para comunicarse
       RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: user
-      RABBITMQ_PASS: password
+      RABBITMQ_USER: voipuser
+      RABBITMQ_PASS: voip1234
       # Ejemplo: GOOGLE_APPLICATION_CREDENTIALS: /app/google_creds.json
     volumes:
       - ./src/stt_tts_interface:/app

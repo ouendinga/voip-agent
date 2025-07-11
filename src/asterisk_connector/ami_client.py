@@ -3,6 +3,8 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
+import pika
+
 
 class AMIClientProtocol(asyncio.Protocol):
     def __init__(self, client):
@@ -46,6 +48,26 @@ class AMIClient:
         self._action_id = 0
         self._pending_actions = {}
         self._running = False
+
+        # RabbitMQ connection setup
+        self.rabbitmq_host = os.getenv("RABBITMQ_HOST", "localhost")
+        self.rabbitmq_user = os.getenv("RABBITMQ_USER", "guest")
+        self.rabbitmq_pass = os.getenv("RABBITMQ_PASS", "guest")
+        self.rabbitmq_conn = None
+        self.rabbitmq_channel = None
+        self._setup_rabbitmq()
+
+    def _setup_rabbitmq(self):
+        credentials = pika.PlainCredentials(self.rabbitmq_user, self.rabbitmq_pass)
+        parameters = pika.ConnectionParameters(host=self.rabbitmq_host, credentials=credentials)
+        try:
+            self.rabbitmq_conn = pika.BlockingConnection(parameters)
+            self.rabbitmq_channel = self.rabbitmq_conn.channel()
+            self.rabbitmq_channel.queue_declare(queue='incoming_audio_chunks', durable=True)
+        except Exception as e:
+            logging.error(f"AMI: Error conectando a RabbitMQ: {e}")
+            self.rabbitmq_conn = None
+            self.rabbitmq_channel = None
 
     async def connect(self):
         self._running = True
@@ -115,13 +137,51 @@ class AMIClient:
             if ":" in line:
                 k, v = line.split(":", 1)
                 data[k.strip()] = v.strip()
+
         if "ActionID" in data and data["ActionID"] in self._pending_actions:
             fut = self._pending_actions[data["ActionID"]]
             if not fut.done():
                 fut.set_result(data)
         elif "Event" in data:
+            event_type = data.get("Event")
+            call_id = data.get("Channel")
+            if event_type == "Newchannel" and call_id:
+                logging.info(f"AMI: Nueva llamada iniciada para call_id={call_id}")
+                # Simular transcripción inicial
+                simulated_transcript = {
+                    "call_id": call_id,
+                    "text": "El usuario dice: 'Hola, ¿en qué puedo ayudarle?'"
+                }
+                # Publicar en RabbitMQ
+                if self.rabbitmq_channel:
+                    try:
+                        self.rabbitmq_channel.basic_publish(
+                            exchange='',
+                            routing_key='incoming_audio_chunks',
+                            body=str(simulated_transcript),
+                            properties=pika.BasicProperties(delivery_mode=2)
+                        )
+                        logging.info(f"Publicado en RabbitMQ: {simulated_transcript}")
+                    except Exception as e:
+                        logging.error(f"Error publicando en RabbitMQ: {e}")
+            elif event_type == "Hangup" and call_id:
+                logging.info(f"AMI: Llamada finalizada para call_id={call_id}")
+                # Publicar fin de llamada si se desea
+                end_msg = {"call_id": call_id, "event": "call_ended"}
+                if self.rabbitmq_channel:
+                    try:
+                        self.rabbitmq_channel.basic_publish(
+                            exchange='',
+                            routing_key='incoming_audio_chunks',
+                            body=str(end_msg),
+                            properties=pika.BasicProperties(delivery_mode=2)
+                        )
+                        logging.info(f"Publicado fin de llamada en RabbitMQ: {end_msg}")
+                    except Exception as e:
+                        logging.error(f"Error publicando fin de llamada en RabbitMQ: {e}")
+            # Poner el evento en la cola interna también
             await self.event_queue.put(data)
-            logging.info(f"AMI: Evento recibido: {data.get('Event')}")
+            logging.info(f"AMI: Evento recibido: {event_type}")
         else:
             # Mensaje no identificado
             await self.event_queue.put(data)
