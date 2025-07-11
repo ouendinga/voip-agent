@@ -12,7 +12,11 @@ import time
 from datetime import datetime
 
 import aio_pika
-from ami_client import AMIClient
+
+try:
+    from .ami_client import AMIClient
+except ImportError:
+    from ami_client import AMIClient
 
 
 class AGIServer:
