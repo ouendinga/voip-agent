@@ -71,6 +71,32 @@ docker compose ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
 
 ## Uso del Sistema
 
+
+## Pruebas y Testing
+
+Para ejecutar los tests de Python (mock y reales), asegúrate de tener las dependencias instaladas:
+
+```powershell
+pip install -r requirements.txt
+pip install pytest pytest-asyncio
+```
+
+Luego ejecuta los tests usando PYTHONPATH para que los imports funcionen correctamente:
+
+### En PowerShell (Windows):
+```powershell
+$env:PYTHONPATH="." ; pytest tests
+```
+
+### En Bash/Linux/Mac:
+```bash
+PYTHONPATH=. pytest tests
+```
+
+Esto permite que los imports absolutos funcionen y es la forma recomendada para proyectos Python estructurados.
+
+---
+
 ### Comandos Principales
 
 ```powershell
