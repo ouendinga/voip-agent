@@ -27,5 +27,44 @@ async def test_ami_client_connect(monkeypatch):
         assert client._authenticated.is_set(), "No se autenticó correctamente con el AMI"
     except asyncio.TimeoutError:
         pytest.skip("Timeout: No se pudo conectar al AMI. ¿Está el servidor disponible?")
+
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_ami_client_handle_message_parsing(monkeypatch):
+    """
+    Prueba el parseo de eventos AMI en handle_message.
+    """
+    client = AMIClient()
+    # Mockear el canal de RabbitMQ para evitar publicaciones reales
+    client.rabbitmq_channel = None
+    # Mensaje AMI simulado
+    msg = "Event: Newchannel\r\nChannel: SIP/100-00000001\r\nUniqueid: 123456\r\n\r\n"
+    await client.handle_message(msg.strip())
+    # El evento debe estar en la cola interna
+    event = await client.event_queue.get()
+    assert event["Event"] == "Newchannel"
+    assert event["Channel"] == "SIP/100-00000001"
+
+
+@pytest.mark.asyncio
+async def test_ami_client_rabbitmq_publish(monkeypatch):
+    """
+    Prueba que se publique en RabbitMQ al recibir un evento Newchannel.
+    """
+    client = AMIClient()
+    published = {}
+    class DummyChannel:
+        def basic_publish(self, exchange, routing_key, body, properties):
+            published["exchange"] = exchange
+            published["routing_key"] = routing_key
+            published["body"] = body
+            published["properties"] = properties
+    client.rabbitmq_channel = DummyChannel()
+    msg = "Event: Newchannel\r\nChannel: SIP/200-00000002\r\nUniqueid: 654321\r\n\r\n"
+    await client.handle_message(msg.strip())
+    # Verifica que se haya publicado algo en RabbitMQ
+    assert published["routing_key"] == "incoming_audio_chunks"
+    assert "SIP/200-00000002" in published["body"]
