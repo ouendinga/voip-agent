@@ -1,0 +1,5 @@
+gTTS
+SpeechRecognition
+pydub
+grpcio
+protobuf

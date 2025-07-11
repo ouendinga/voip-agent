@@ -2,8 +2,10 @@ FROM python:3.9-slim-buster
 
 WORKDIR /app
 
-# Instalar dependencias para gRPC y RabbitMQ
-RUN pip install grpcio grpcio-tools pika python-dotenv
+
+# Instalar dependencias desde requirements.txt
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar los archivos proto y generar el código Python de gRPC
 COPY proto/ /proto/
