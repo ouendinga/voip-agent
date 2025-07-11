@@ -144,12 +144,17 @@ class AMIClient:
                 fut.set_result(data)
         elif "Event" in data:
             event_type = data.get("Event")
+            # El call_id debe ser SIEMPRE el Channel de Asterisk (ej: SIP/mi_ext-00000001)
             call_id = data.get("Channel")
-            if event_type == "Newchannel" and call_id:
-                logging.info(f"AMI: Nueva llamada iniciada para call_id={call_id}")
+            if not call_id:
+                logging.warning("No se encontró Channel en el evento AMI; no se puede establecer call_id único para la llamada.")
+                return
+            # Usar call_id (Channel) como identificador único en todos los mensajes
+            if event_type == "Newchannel":
+                logging.info(f"AMI: Nueva llamada iniciada para call_id={call_id} (Channel)")
                 # Simular transcripción inicial
                 simulated_transcript = {
-                    "call_id": call_id,
+                    "call_id": call_id,  # Channel como call_id
                     "text": "El usuario dice: 'Hola, ¿en qué puedo ayudarle?'"
                 }
                 # Publicar en RabbitMQ
@@ -164,8 +169,8 @@ class AMIClient:
                         logging.info(f"Publicado en RabbitMQ: {simulated_transcript}")
                     except Exception as e:
                         logging.error(f"Error publicando en RabbitMQ: {e}")
-            elif event_type == "Hangup" and call_id:
-                logging.info(f"AMI: Llamada finalizada para call_id={call_id}")
+            elif event_type == "Hangup":
+                logging.info(f"AMI: Llamada finalizada para call_id={call_id} (Channel)")
                 # Publicar fin de llamada si se desea
                 end_msg = {"call_id": call_id, "event": "call_ended"}
                 if self.rabbitmq_channel:

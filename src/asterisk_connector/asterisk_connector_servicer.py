@@ -35,17 +35,29 @@ class AsteriskConnectorServicer(asterisk_service_pb2_grpc.AsteriskConnectorServi
             self.rabbitmq_channel = None
 
     async def HandleCallStream(self, request_iterator, context):
-        # En este ejemplo, solo consumimos mensajes de outgoing_audio_chunks y los "enviamos" a Asterisk (simulado)
+        """
+        Procesa el stream gRPC de llamadas. El call_id DEBE ser el Channel de Asterisk (ej: SIP/mi_ext-00000001)
+        para garantizar unicidad y trazabilidad en todo el flujo.
+        """
         logging.info("HandleCallStream iniciado. Consumiendo de outgoing_audio_chunks...")
         if not self.rabbitmq_channel:
             logging.error("No hay canal RabbitMQ disponible.")
             return
-        for method_frame, properties, body in self.rabbitmq_channel.consume('outgoing_audio_chunks', inactivity_timeout=1):
-            if body:
-                logging.info(f"Simulando envío a Asterisk: {body.decode() if hasattr(body, 'decode') else body}")
-                self.rabbitmq_channel.basic_ack(method_frame.delivery_tag)
-                # Aquí podrías enviar una respuesta al cliente gRPC si lo deseas
-            await asyncio.sleep(0.1)  # Simula procesamiento
+        async for request in request_iterator:
+            call_id = request.call_id
+            if not call_id:
+                logging.warning("[gRPC] call_id ausente en el request. Debe ser el Channel de Asterisk.")
+                continue
+            # Aquí podrías procesar el request, asegurando que call_id es el Channel
+            logging.info(f"[gRPC] Procesando request para call_id={call_id} (Channel)")
+            # Simulación: consumir mensajes de outgoing_audio_chunks
+            for method_frame, properties, body in self.rabbitmq_channel.consume('outgoing_audio_chunks', inactivity_timeout=1):
+                if body:
+                    logging.info(f"Simulando envío a Asterisk: {body.decode() if hasattr(body, 'decode') else body}")
+                    self.rabbitmq_channel.basic_ack(method_frame.delivery_tag)
+                    # Aquí podrías enviar una respuesta al cliente gRPC si lo deseas
+                await asyncio.sleep(0.1)  # Simula procesamiento
+            break  # Solo procesar un ciclo por request para evitar bucles infinitos en este ejemplo
         logging.info("Fin de consumo de outgoing_audio_chunks.")
         # Aquí normalmente se respondería vía gRPC stream, pero este ejemplo es solo para simular el flujo.
 
