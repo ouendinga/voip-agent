@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional
 
 import pika
 
+from .rabbitmq_publisher import RabbitMQPublisher
+
 
 class AMIClientProtocol(asyncio.Protocol):
     def __init__(self, client):
@@ -33,7 +35,7 @@ class AMIClientProtocol(asyncio.Protocol):
             self.transport.write(data.encode())
 
 class AMIClient:
-    def __init__(self, loop=None):
+    def __init__(self, loop=None, publisher=None):
         self.host = os.getenv("ASTERISK_HOST", "127.0.0.1")
         self.port = int(os.getenv("ASTERISK_AMI_PORT", "5038"))
         self.username = os.getenv("ASTERISK_AMI_USER", "admin")
@@ -56,6 +58,13 @@ class AMIClient:
         self.rabbitmq_conn = None
         self.rabbitmq_channel = None
         self._setup_rabbitmq()
+        # Publisher desacoplado
+        if publisher is not None:
+            self.publisher = publisher
+        elif self.rabbitmq_channel is not None:
+            self.publisher = RabbitMQPublisher(self.rabbitmq_channel)
+        else:
+            self.publisher = None
 
     def _setup_rabbitmq(self):
         credentials = pika.PlainCredentials(self.rabbitmq_user, self.rabbitmq_pass)
@@ -143,54 +152,37 @@ class AMIClient:
             if not fut.done():
                 fut.set_result(data)
         elif "Event" in data:
-            event_type = data.get("Event")
-            # El call_id debe ser SIEMPRE el Channel de Asterisk (ej: SIP/mi_ext-00000001)
-            call_id = data.get("Channel")
-            if not call_id:
-                logging.warning("No se encontró Channel en el evento AMI; no se puede establecer call_id único para la llamada.")
-                return
-            # Usar call_id (Channel) como identificador único en todos los mensajes
-            if event_type == "Newchannel":
-                logging.info(f"AMI: Nueva llamada iniciada para call_id={call_id} (Channel)")
-                # Simular transcripción inicial
-                simulated_transcript = {
-                    "call_id": call_id,  # Channel como call_id
-                    "text": "El usuario dice: 'Hola, ¿en qué puedo ayudarle?'"
-                }
-                # Publicar en RabbitMQ
-                if self.rabbitmq_channel:
-                    try:
-                        self.rabbitmq_channel.basic_publish(
-                            exchange='',
-                            routing_key='incoming_audio_chunks',
-                            body=str(simulated_transcript),
-                            properties=pika.BasicProperties(delivery_mode=2)
-                        )
-                        logging.info(f"Publicado en RabbitMQ: {simulated_transcript}")
-                    except Exception as e:
-                        logging.error(f"Error publicando en RabbitMQ: {e}")
-            elif event_type == "Hangup":
-                logging.info(f"AMI: Llamada finalizada para call_id={call_id} (Channel)")
-                # Publicar fin de llamada si se desea
-                end_msg = {"call_id": call_id, "event": "call_ended"}
-                if self.rabbitmq_channel:
-                    try:
-                        self.rabbitmq_channel.basic_publish(
-                            exchange='',
-                            routing_key='incoming_audio_chunks',
-                            body=str(end_msg),
-                            properties=pika.BasicProperties(delivery_mode=2)
-                        )
-                        logging.info(f"Publicado fin de llamada en RabbitMQ: {end_msg}")
-                    except Exception as e:
-                        logging.error(f"Error publicando fin de llamada en RabbitMQ: {e}")
-            # Poner el evento en la cola interna también
+            await self.process_ami_events(data)
             await self.event_queue.put(data)
-            logging.info(f"AMI: Evento recibido: {event_type}")
+            logging.info(f"AMI: Evento recibido: {data.get('Event')}")
         else:
             # Mensaje no identificado
             await self.event_queue.put(data)
             logging.info(f"AMI: Mensaje recibido: {data}")
+
+    async def process_ami_events(self, data):
+        """
+        Procesa eventos AMI y publica en RabbitMQ usando el publisher desacoplado.
+        """
+        event_type = data.get("Event")
+        call_id = data.get("Channel")
+        if not call_id:
+            logging.warning("No se encontró Channel en el evento AMI; no se puede establecer call_id único para la llamada.")
+            return
+        if not self.publisher:
+            logging.warning("No hay publisher de RabbitMQ disponible.")
+            return
+        if event_type == "Newchannel":
+            logging.info(f"AMI: Nueva llamada iniciada para call_id={call_id} (Channel)")
+            simulated_transcript = {
+                "call_id": call_id,
+                "text": "El usuario dice: 'Hola, ¿en qué puedo ayudarle?'"
+            }
+            self.publisher.publish("incoming_audio_chunks", str(simulated_transcript))
+        elif event_type == "Hangup":
+            logging.info(f"AMI: Llamada finalizada para call_id={call_id} (Channel)")
+            end_msg = {"call_id": call_id, "event": "call_ended"}
+            self.publisher.publish("incoming_audio_chunks", str(end_msg))
 
     async def on_connection_lost(self, exc):
         self._connected.clear()
