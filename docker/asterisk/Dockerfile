@@ -5,6 +5,7 @@ FROM alpine:3.18
 RUN apk add --no-cache \
 	asterisk \
 	asterisk-sounds-en \
+	asterisk-sample-config \
 	net-tools \
 	iputils \
 	vim \

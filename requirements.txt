@@ -1,0 +1,3 @@
+# requirements.txt para stt_tts_service
+# Agrega aquí los paquetes necesarios para tu servicio STT/TTS
+grpcio-tools

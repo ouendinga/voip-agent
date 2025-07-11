@@ -78,6 +78,9 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: voipuser
       RABBITMQ_PASS: voip1234
+      PORT_AGI: 4573
+    ports:
+      - "4573:4573" # Puerto AGI expuesto para Asterisk
     volumes:
       - ./src/asterisk_connector:/app # Monta el código del módulo
       - ./proto:/proto # Monta los archivos proto para la generación de código gRPC
